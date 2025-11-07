@@ -70,9 +70,18 @@ fun ArchiveImporterApp() {
                                 selectArchiveFile()
                             }
                             file?.let {
-                                // Validate that the selected item is a file, not a directory
-                                if (it.isDirectory) {
-                                    errorMessage = "Cannot select a directory. Please select an archive file (APK, AAR, AAB, or JAR)."
+                                // Try to get archive info to validate it's a proper archive
+                                val info = withContext(Dispatchers.IO) {
+                                    extractor.getArchiveInfo(it)
+                                }
+
+                                if (info == null) {
+                                    // Check if it's a directory without a valid extension
+                                    if (it.isDirectory && it.extension.lowercase() !in listOf("apk", "aar", "aab", "jar")) {
+                                        errorMessage = "Cannot select a directory. Please select an archive file (APK, AAR, AAB, or JAR)."
+                                    } else {
+                                        errorMessage = "Invalid archive file. Please select a valid APK, AAR, AAB, or JAR file."
+                                    }
                                     selectedFile = null
                                     archiveInfo = null
                                     extractionResult = null
@@ -80,9 +89,7 @@ fun ArchiveImporterApp() {
                                 } else {
                                     errorMessage = null
                                     selectedFile = it
-                                    archiveInfo = withContext(Dispatchers.IO) {
-                                        extractor.getArchiveInfo(it)
-                                    }
+                                    archiveInfo = info
                                     extractionResult = null
                                     progressMessages = emptyList()
                                 }
@@ -283,8 +290,10 @@ private fun selectArchiveFile(): File? {
             "Archive Files (*.apk, *.aar, *.aab, *.jar)",
             "apk", "aar", "aab", "jar"
         )
+        addChoosableFileFilter(filter)
         fileFilter = filter
-        isAcceptAllFileFilterUsed = false
+        // Allow "All Files" option as fallback for macOS compatibility
+        isAcceptAllFileFilterUsed = true
     }
 
     return if (fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {

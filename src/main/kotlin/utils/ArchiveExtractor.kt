@@ -40,8 +40,9 @@ class ArchiveExtractor {
                 )
             }
 
-            // Check if the path is a directory instead of a file
-            if (archiveFile.isDirectory) {
+            // Check if the path is a directory without a valid archive extension
+            // (On macOS, some archives like .apk might be treated as directories/packages)
+            if (archiveFile.isDirectory && archiveFile.extension.lowercase() !in listOf("apk", "aar", "aab", "jar")) {
                 return ExtractionResult(
                     success = false,
                     errorMessage = "Selected path is a directory, not a file. Please select an archive file (APK, AAR, AAB, or JAR)."
@@ -127,13 +128,21 @@ class ArchiveExtractor {
      */
     fun getArchiveInfo(archiveFile: File): ArchiveInfo? {
         try {
-            if (!archiveFile.exists() || archiveFile.isDirectory || !isValidArchive(archiveFile)) {
+            // Check file exists and has valid extension
+            if (!archiveFile.exists() || !isValidArchive(archiveFile)) {
+                return null
+            }
+
+            // For directories without valid extensions, reject them
+            // But allow files that might be treated as directories by the OS (like .apk on macOS)
+            if (archiveFile.isDirectory && archiveFile.extension.lowercase() !in listOf("apk", "aar", "aab", "jar")) {
                 return null
             }
 
             var entryCount = 0
             val entries = mutableListOf<String>()
 
+            // Try to read as ZIP - this will fail if it's not a valid archive
             ZipInputStream(FileInputStream(archiveFile)).use { zipInputStream ->
                 var entry: ZipEntry? = zipInputStream.nextEntry
 

@@ -40,6 +40,14 @@ class ArchiveExtractor {
                 )
             }
 
+            // Check if the path is a directory instead of a file
+            if (archiveFile.isDirectory) {
+                return ExtractionResult(
+                    success = false,
+                    errorMessage = "Selected path is a directory, not a file. Please select an archive file (APK, AAR, AAB, or JAR)."
+                )
+            }
+
             if (!isValidArchive(archiveFile)) {
                 return ExtractionResult(
                     success = false,
@@ -119,7 +127,7 @@ class ArchiveExtractor {
      */
     fun getArchiveInfo(archiveFile: File): ArchiveInfo? {
         try {
-            if (!archiveFile.exists() || !isValidArchive(archiveFile)) {
+            if (!archiveFile.exists() || archiveFile.isDirectory || !isValidArchive(archiveFile)) {
                 return null
             }
 

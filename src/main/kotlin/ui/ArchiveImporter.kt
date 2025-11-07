@@ -30,6 +30,7 @@ fun ArchiveImporterApp() {
     var extractionResult by remember { mutableStateOf<ArchiveExtractor.ExtractionResult?>(null) }
     var progressMessages by remember { mutableStateOf<List<String>>(emptyList()) }
     var isExtracting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val extractor = remember { ArchiveExtractor() }
     val scope = rememberCoroutineScope()
@@ -69,12 +70,22 @@ fun ArchiveImporterApp() {
                                 selectArchiveFile()
                             }
                             file?.let {
-                                selectedFile = it
-                                archiveInfo = withContext(Dispatchers.IO) {
-                                    extractor.getArchiveInfo(it)
+                                // Validate that the selected item is a file, not a directory
+                                if (it.isDirectory) {
+                                    errorMessage = "Cannot select a directory. Please select an archive file (APK, AAR, AAB, or JAR)."
+                                    selectedFile = null
+                                    archiveInfo = null
+                                    extractionResult = null
+                                    progressMessages = emptyList()
+                                } else {
+                                    errorMessage = null
+                                    selectedFile = it
+                                    archiveInfo = withContext(Dispatchers.IO) {
+                                        extractor.getArchiveInfo(it)
+                                    }
+                                    extractionResult = null
+                                    progressMessages = emptyList()
                                 }
-                                extractionResult = null
-                                progressMessages = emptyList()
                             }
                         }
                     },
@@ -87,6 +98,31 @@ fun ArchiveImporterApp() {
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                // Display error message if any
+                errorMessage?.let { error ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        backgroundColor = Color(0xFF8B0000),
+                        elevation = 4.dp
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "⚠ Error",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                error,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
 
                 // Display selected file info
                 selectedFile?.let { file ->

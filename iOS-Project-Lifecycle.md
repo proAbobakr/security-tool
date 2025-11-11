@@ -7,6 +7,7 @@
 4. [Scene Lifecycle](#scene-lifecycle)
 5. [Development Lifecycle](#development-lifecycle)
 6. [Build and Deployment Lifecycle](#build-and-deployment-lifecycle)
+7. [iOS vs Android Lifecycle Comparison](#ios-vs-android-lifecycle-comparison)
 
 ---
 
@@ -592,6 +593,698 @@ class DataManager: ObservableObject {
     }
 }
 ```
+
+---
+
+## iOS vs Android Lifecycle Comparison
+
+Understanding both iOS and Android lifecycles helps developers build cross-platform applications or migrate between platforms. Here's a comprehensive comparison:
+
+### 1. App Entry Point Comparison
+
+#### iOS (SwiftUI)
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+```
+
+#### Android (Jetpack Compose)
+```kotlin
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MyAppTheme {
+                ContentView()
+            }
+        }
+    }
+}
+
+// In AndroidManifest.xml
+// <application android:name=".MyApplication">
+```
+
+**Key Differences:**
+- iOS uses a struct-based `App` protocol
+- Android uses Activity classes with lifecycle callbacks
+- iOS has no XML manifest equivalent in SwiftUI (uses Info.plist)
+- Android requires AndroidManifest.xml for app configuration
+
+---
+
+### 2. App Lifecycle States Comparison
+
+| iOS State | Android State | Description |
+|-----------|---------------|-------------|
+| Not Running | Not Created | App hasn't been launched |
+| Inactive | Paused | App visible but not receiving events |
+| Active | Resumed | App in foreground and receiving events |
+| Background | Stopped | App not visible but executing code |
+| Suspended | Stopped (cached) | App in memory but not executing |
+
+#### iOS App Lifecycle
+```swift
+@main
+struct MyApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            switch newPhase {
+            case .active:
+                print("App is active")
+            case .inactive:
+                print("App is inactive")
+            case .background:
+                print("App in background")
+            @unknown default:
+                break
+            }
+        }
+    }
+}
+```
+
+#### Android App Lifecycle
+```kotlin
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        println("Activity created")
+    }
+
+    override fun onStart() {
+        super.onStart()
+        println("Activity started")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        println("Activity resumed")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        println("Activity paused")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        println("Activity stopped")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        println("Activity destroyed")
+    }
+}
+```
+
+**Key Differences:**
+- iOS has 3 main states (active, inactive, background)
+- Android has 6 explicit lifecycle callbacks (onCreate, onStart, onResume, onPause, onStop, onDestroy)
+- iOS lifecycle is more simplified with ScenePhase
+- Android provides finer-grained control over each lifecycle stage
+
+---
+
+### 3. View/Screen Lifecycle Comparison
+
+#### iOS (SwiftUI View)
+```swift
+struct ContentView: View {
+    var body: some View {
+        Text("Hello")
+            .onAppear {
+                // Similar to Android's onStart
+                print("View appeared")
+            }
+            .onDisappear {
+                // Similar to Android's onStop
+                print("View disappeared")
+            }
+            .task {
+                // Async work, automatically cancelled
+                await fetchData()
+            }
+    }
+}
+```
+
+#### Android (Composable)
+```kotlin
+@Composable
+fun ContentView() {
+    DisposableEffect(Unit) {
+        // Similar to onAppear
+        println("Composable entered composition")
+
+        onDispose {
+            // Similar to onDisappear
+            println("Composable left composition")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Similar to .task in SwiftUI
+        fetchData()
+    }
+
+    Text("Hello")
+}
+```
+
+#### Android (Traditional Activity/Fragment)
+```kotlin
+class MyFragment : Fragment() {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
+                              savedInstanceState: Bundle?): View {
+        return inflater.inflate(R.layout.fragment_my, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        // Initialize UI
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // View is visible
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // View is interactive
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // View losing focus
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // Clean up view references
+    }
+}
+```
+
+**Comparison Table:**
+
+| iOS SwiftUI | Android Compose | Android Fragment | Purpose |
+|-------------|-----------------|------------------|---------|
+| `init()` | `@Composable` entry | `onCreate()` | Initial setup |
+| `onAppear` | `DisposableEffect` | `onStart()`/`onResume()` | View visible |
+| `onDisappear` | `onDispose` | `onPause()`/`onStop()` | View hidden |
+| `.task` | `LaunchedEffect` | `viewLifecycleOwner.lifecycleScope` | Async work |
+| - | - | `onDestroyView()` | View cleanup |
+
+---
+
+### 4. State Management Comparison
+
+#### iOS SwiftUI
+
+```swift
+// Local state
+@State private var count = 0
+
+// Owned observable object
+@StateObject private var viewModel = ViewModel()
+
+// Passed observable object
+@ObservedObject var sharedModel: SharedModel
+
+// Shared across app
+@EnvironmentObject var appState: AppState
+
+// Binding to parent state
+@Binding var isPresented: Bool
+```
+
+#### Android Compose
+
+```kotlin
+// Local state
+var count by remember { mutableStateOf(0) }
+
+// ViewModel (similar to @StateObject)
+val viewModel: MyViewModel = viewModel()
+
+// Passed state (similar to @ObservedObject)
+val sharedModel: SharedModel = remember { SharedModel() }
+
+// Shared via CompositionLocal (similar to @EnvironmentObject)
+val appState = LocalAppState.current
+
+// Binding-like (passed as parameter)
+fun ChildComposable(
+    isPresented: Boolean,
+    onPresentedChange: (Boolean) -> Unit
+)
+```
+
+#### Android (Traditional ViewModel)
+
+```kotlin
+class MyViewModel : ViewModel() {
+    private val _count = MutableLiveData<Int>(0)
+    val count: LiveData<Int> = _count
+
+    // Or using StateFlow (modern approach)
+    private val _state = MutableStateFlow(0)
+    val state: StateFlow<Int> = _state.asStateFlow()
+
+    fun increment() {
+        _count.value = (_count.value ?: 0) + 1
+    }
+}
+
+// In Activity/Fragment
+class MyActivity : ComponentActivity() {
+    private val viewModel: MyViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        viewModel.count.observe(this) { count ->
+            // Update UI
+        }
+    }
+}
+```
+
+**Key Differences:**
+
+| Feature | iOS SwiftUI | Android Compose | Android Traditional |
+|---------|-------------|-----------------|---------------------|
+| Local State | `@State` | `remember { mutableStateOf() }` | `LiveData`/`StateFlow` |
+| Owned ViewModel | `@StateObject` | `viewModel()` | `by viewModels()` |
+| Observation | Automatic | Automatic | Manual (`observe()`) |
+| Lifecycle-aware | Built-in | Built-in | Requires LifecycleOwner |
+| Sharing State | `@EnvironmentObject` | `CompositionLocalProvider` | Shared ViewModel |
+
+---
+
+### 5. Navigation Comparison
+
+#### iOS (SwiftUI)
+
+```swift
+struct AppRoot: View {
+    @State private var path = NavigationPath()
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            ListView()
+                .navigationDestination(for: User.self) { user in
+                    DetailView(user: user)
+                }
+        }
+    }
+}
+
+// Navigate
+path.append(user)
+
+// Go back
+path.removeLast()
+```
+
+#### Android (Compose Navigation)
+
+```kotlin
+@Composable
+fun AppRoot() {
+    val navController = rememberNavController()
+
+    NavHost(navController, startDestination = "list") {
+        composable("list") {
+            ListView(navController)
+        }
+        composable("detail/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId")
+            DetailView(userId)
+        }
+    }
+}
+
+// Navigate
+navController.navigate("detail/$userId")
+
+// Go back
+navController.popBackStack()
+```
+
+#### Android (Traditional)
+
+```kotlin
+// Using Intent
+val intent = Intent(this, DetailActivity::class.java)
+intent.putExtra("USER_ID", userId)
+startActivity(intent)
+
+// Using FragmentManager
+supportFragmentManager.beginTransaction()
+    .replace(R.id.container, DetailFragment.newInstance(userId))
+    .addToBackStack(null)
+    .commit()
+```
+
+---
+
+### 6. Build & Deployment Comparison
+
+#### iOS Build Process
+
+```
+.swift files → Swift Compiler → LLVM → .app bundle → Code Signing → .ipa
+```
+
+**Tools:**
+- Xcode
+- xcodebuild (CLI)
+- fastlane (automation)
+
+**Distribution:**
+- App Store Connect
+- TestFlight (beta testing)
+- Ad Hoc distribution
+
+#### Android Build Process
+
+```
+.kt/.java files → Kotlin/Java Compiler → .dex files → APK/AAB → Signing → Distribution
+```
+
+**Tools:**
+- Android Studio
+- Gradle (build system)
+- fastlane (automation)
+
+**Distribution:**
+- Google Play Console
+- Internal/Closed/Open Testing tracks
+- Direct APK distribution
+
+**Comparison:**
+
+| Aspect | iOS | Android |
+|--------|-----|---------|
+| **IDE** | Xcode | Android Studio |
+| **Build System** | xcodebuild | Gradle |
+| **Package Format** | .ipa (internally .app) | .apk / .aab (Android App Bundle) |
+| **Code Signing** | Mandatory, certificate-based | Mandatory, keystore-based |
+| **Beta Testing** | TestFlight | Internal/Closed Testing |
+| **Store** | App Store (single) | Google Play, Samsung Store, etc. |
+| **Review Time** | 1-3 days average | Few hours average |
+| **Sideloading** | Enterprise only | Freely allowed |
+
+---
+
+### 7. Permissions Comparison
+
+#### iOS
+
+```swift
+// In Info.plist
+<key>NSCameraUsageDescription</key>
+<string>We need camera access for photos</string>
+
+// Request at runtime
+import AVFoundation
+
+AVCaptureDevice.requestAccess(for: .video) { granted in
+    if granted {
+        // Use camera
+    }
+}
+```
+
+#### Android
+
+```xml
+<!-- In AndroidManifest.xml -->
+<uses-permission android:name="android.permission.CAMERA" />
+
+<!-- For Android 6.0+ (API 23+) -->
+```
+
+```kotlin
+// Request at runtime
+val cameraPermission = Manifest.permission.CAMERA
+
+if (ContextCompat.checkSelfPermission(this, cameraPermission)
+    != PackageManager.PERMISSION_GRANTED) {
+    ActivityCompat.requestPermissions(this,
+        arrayOf(cameraPermission),
+        REQUEST_CAMERA)
+}
+```
+
+**Key Differences:**
+- iOS requires usage descriptions in Info.plist
+- Android requires declarations in AndroidManifest.xml
+- Android has normal vs dangerous permissions (iOS all require runtime approval)
+- iOS permissions cannot be revoked without reinstalling (older versions)
+- Android users can revoke permissions anytime
+
+---
+
+### 8. Background Execution Comparison
+
+#### iOS
+
+```swift
+// Background tasks (limited)
+import BackgroundTasks
+
+BGTaskScheduler.shared.register(
+    forTaskWithIdentifier: "com.app.refresh",
+    using: nil
+) { task in
+    handleRefresh(task: task as! BGAppRefreshTask)
+}
+
+// Background modes (Info.plist)
+// - Audio
+// - Location updates
+// - VoIP
+// - External accessory communication
+// - Bluetooth
+// - Background fetch
+```
+
+#### Android
+
+```kotlin
+// WorkManager (recommended)
+val workRequest = OneTimeWorkRequestBuilder<MyWorker>()
+    .build()
+
+WorkManager.getInstance(context)
+    .enqueue(workRequest)
+
+// Foreground Service (long-running tasks)
+class MyForegroundService : Service() {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val notification = createNotification()
+        startForeground(NOTIFICATION_ID, notification)
+        return START_STICKY
+    }
+}
+```
+
+**Key Differences:**
+- iOS heavily restricts background execution
+- Android allows more flexible background work via Services
+- iOS requires specific background modes to be declared
+- Android foreground services must show a notification
+- Both systems increasingly restrict background work to save battery
+
+---
+
+### 9. Dependency Management
+
+#### iOS
+
+```swift
+// Swift Package Manager (SPM)
+// In Xcode: File → Add Packages
+
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.0.0")
+]
+
+// CocoaPods (legacy)
+// Podfile
+pod 'Alamofire', '~> 5.0'
+```
+
+#### Android
+
+```kotlin
+// Gradle
+// build.gradle.kts
+dependencies {
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("androidx.compose.ui:ui:1.5.0")
+}
+```
+
+**Comparison:**
+- iOS: SPM (modern), CocoaPods (legacy), Carthage (less common)
+- Android: Gradle (standard), Maven repositories
+- Both support semantic versioning
+- Gradle is more mature and feature-rich
+- SPM is built into Xcode (no separate tool needed)
+
+---
+
+### 10. Testing Comparison
+
+#### iOS
+
+```swift
+// Unit Test
+import XCTest
+@testable import MyApp
+
+class MyTests: XCTestCase {
+    func testExample() {
+        XCTAssertEqual(2 + 2, 4)
+    }
+}
+
+// UI Test
+func testLoginFlow() {
+    let app = XCUIApplication()
+    app.launch()
+    app.buttons["Login"].tap()
+    XCTAssertTrue(app.staticTexts["Welcome"].exists)
+}
+```
+
+#### Android
+
+```kotlin
+// Unit Test
+import org.junit.Test
+import org.junit.Assert.*
+
+class MyTests {
+    @Test
+    fun testExample() {
+        assertEquals(4, 2 + 2)
+    }
+}
+
+// UI Test (Espresso)
+@Test
+fun testLoginFlow() {
+    onView(withId(R.id.loginButton))
+        .perform(click())
+    onView(withText("Welcome"))
+        .check(matches(isDisplayed()))
+}
+
+// Compose UI Test
+@Test
+fun testLoginFlow() {
+    composeTestRule.setContent {
+        LoginScreen()
+    }
+    composeTestRule.onNodeWithText("Login")
+        .performClick()
+    composeTestRule.onNodeWithText("Welcome")
+        .assertIsDisplayed()
+}
+```
+
+**Key Differences:**
+- iOS: XCTest (built-in), XCUITest for UI
+- Android: JUnit (unit), Espresso (UI), Compose Test (Compose UI)
+- Android testing is more fragmented (multiple frameworks)
+- iOS has better integration with Xcode
+- Android has more powerful instrumentation testing
+
+---
+
+### 11. Key Philosophical Differences
+
+| Aspect | iOS/SwiftUI | Android/Compose |
+|--------|-------------|-----------------|
+| **Approach** | Declarative, "single source of truth" | Declarative, "unidirectional data flow" |
+| **Platform Control** | Tightly controlled by Apple | More open, multiple OEMs |
+| **Fragmentation** | Low (recent iOS versions dominate) | High (many OS versions in use) |
+| **Development Style** | Protocol-oriented, value types preferred | Object-oriented, classes common |
+| **Type System** | Strong, strict (Swift) | Strong, nullable types (Kotlin) |
+| **Memory Management** | ARC (Automatic Reference Counting) | Garbage Collection |
+| **UI Updates** | Automatic via state changes | Automatic via recomposition |
+| **Platform Features** | Deep Apple ecosystem integration | Google services integration |
+
+---
+
+### 12. Migration Considerations
+
+#### Android → iOS
+
+**Challenges:**
+- Learning Swift/SwiftUI syntax
+- Understanding iOS-specific concepts (optionals, protocols)
+- Adapting to Xcode
+- Different navigation patterns
+- Stricter App Store review
+
+**Advantages:**
+- Less device fragmentation
+- Predictable lifecycle
+- Better performance on older devices
+- SwiftUI more intuitive for some developers
+
+#### iOS → Android
+
+**Challenges:**
+- Learning Kotlin/Compose
+- Understanding Android Activity/Fragment model
+- Gradle build system complexity
+- Device fragmentation testing
+- More background execution options
+
+**Advantages:**
+- More flexible background processing
+- Easier sideloading for testing
+- More distribution options
+- Greater customization capabilities
+
+---
+
+### Summary: Quick Reference
+
+| Feature | iOS (SwiftUI) | Android (Compose) |
+|---------|---------------|-------------------|
+| **Entry Point** | `@main struct: App` | `ComponentActivity` |
+| **View** | `struct: View` | `@Composable fun` |
+| **State** | `@State`, `@StateObject` | `remember { mutableStateOf() }` |
+| **Lifecycle** | `onAppear`, `onDisappear` | `DisposableEffect`, `onDispose` |
+| **Navigation** | `NavigationStack` | `NavHost` + `NavController` |
+| **Async** | `async`/`await`, `.task` | Coroutines, `LaunchedEffect` |
+| **DI** | `@EnvironmentObject` | `CompositionLocalProvider` |
+| **Testing** | XCTest | JUnit + Espresso |
+| **Build** | Xcode + xcodebuild | Android Studio + Gradle |
+| **Package** | .ipa | .apk / .aab |
+
+Both platforms have converged toward declarative UI paradigms, making cross-platform development knowledge more transferable than ever before.
 
 ---
 

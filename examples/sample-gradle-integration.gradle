@@ -1,0 +1,74 @@
+// Example: How to integrate Android Security Analyzer into your build.gradle
+
+buildscript {
+    repositories {
+        mavenCentral()
+        google()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        // Add the security analyzer plugin
+        classpath files('../gradle-plugin/build/libs/android-security-analyzer-plugin-1.0.0.jar')
+    }
+}
+
+apply plugin: 'com.android.application'
+apply plugin: 'com.security.analyzer.android'
+
+android {
+    namespace 'com.example.myapp'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.example.myapp"
+        minSdk 23
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+// Configure the security analyzer
+securityAnalyzer {
+    // Minimum severity to report (INFO, LOW, MEDIUM, HIGH, CRITICAL)
+    minSeverity = 'MEDIUM'
+
+    // Report format (html, json, markdown)
+    reportFormat = 'html'
+
+    // Output directory for reports
+    reportOutputDir = 'build/reports/security'
+
+    // Fail build on critical/high findings
+    failOnError = false
+
+    // Path to custom rules file (optional)
+    // customRulesFile = 'security-rules.yaml'
+
+    // Enable/disable specific checks
+    checkPermissions = true
+    checkDebuggable = true
+    checkBackup = true
+    checkNetworkSecurity = true
+    checkExportedComponents = true
+    checkCryptography = true
+    checkHardcodedSecrets = true
+    checkObfuscation = true
+}
+
+// Optional: Run security analysis after assembling release build
+tasks.named('assembleRelease').configure {
+    finalizedBy 'analyzeSecurityFindings'
+}
+
+// Optional: Make security analysis part of the check task
+tasks.named('check').configure {
+    dependsOn 'analyzeSecurityFindings'
+}

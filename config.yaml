@@ -1,0 +1,100 @@
+# Android Security Analyzer Configuration
+
+# Minimum severity level to report (INFO, LOW, MEDIUM, HIGH, CRITICAL)
+min_severity: MEDIUM
+
+# Report format (html, json, markdown)
+report_format: html
+
+# Output directory for reports
+output_dir: reports
+
+# Fail build on critical/high findings
+fail_on_critical: true
+fail_on_high: false
+
+# OWASP Mobile Top 10 Checks Configuration
+checks:
+  # M1: Improper Platform Usage
+  check_permissions: true
+  check_exported_components: true
+  check_webview_security: true
+  check_deeplinks: true
+
+  # M2: Insecure Data Storage
+  check_backup_allowed: true
+  check_external_storage: true
+  check_insecure_storage: true
+
+  # M3: Insecure Communication
+  check_network_security: true
+  check_cleartext_traffic: true
+  check_certificate_pinning: true
+
+  # M4: Insecure Authentication
+  check_authentication: true
+
+  # M5: Insufficient Cryptography
+  check_weak_crypto: true
+  check_hardcoded_secrets: true
+  check_insecure_random: true
+
+  # M6: Insecure Authorization
+  check_authorization: true
+
+  # M7: Client Code Quality
+  check_debuggable: true
+  check_logging: true
+  check_sql_injection: true
+
+  # M8: Code Tampering
+  check_root_detection: true
+  check_integrity: true
+
+  # M9: Reverse Engineering
+  check_obfuscation: true
+  check_native_libs: true
+
+  # M10: Extraneous Functionality
+  check_test_code: true
+  check_backdoors: true
+
+# Dangerous permissions that require special attention
+dangerous_permissions:
+  - android.permission.READ_SMS
+  - android.permission.SEND_SMS
+  - android.permission.READ_CONTACTS
+  - android.permission.CAMERA
+  - android.permission.RECORD_AUDIO
+  - android.permission.ACCESS_FINE_LOCATION
+  - android.permission.READ_PHONE_STATE
+
+# Allowed cryptographic algorithms
+allowed_algorithms:
+  encryption:
+    - AES/GCM/NoPadding
+    - AES/CBC/PKCS5Padding
+    - RSA/ECB/OAEPWithSHA-256AndMGF1Padding
+  hashing:
+    - SHA-256
+    - SHA-384
+    - SHA-512
+    - SHA3-256
+    - SHA3-512
+
+# Minimum SDK version recommendations
+min_sdk_recommendation: 23  # Android 6.0
+target_sdk_recommendation: 33  # Android 13
+
+# Patterns to detect hardcoded secrets
+secret_patterns:
+  - api[_-]?key
+  - api[_-]?secret
+  - password\s*=
+  - secret\s*=
+  - token\s*=
+  - aws_access_key
+  - private[_-]?key
+
+# Custom rules (optional)
+custom_rules: []

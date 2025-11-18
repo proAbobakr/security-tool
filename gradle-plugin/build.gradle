@@ -1,0 +1,33 @@
+plugins {
+    id 'groovy'
+    id 'java-gradle-plugin'
+    id 'maven-publish'
+}
+
+group = 'com.security.analyzer'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation gradleApi()
+    implementation localGroovy()
+    implementation 'com.android.tools.build:gradle:8.1.0'
+}
+
+gradlePlugin {
+    plugins {
+        androidSecurityAnalyzer {
+            id = 'com.security.analyzer.android'
+            implementationClass = 'com.security.analyzer.AndroidSecurityAnalyzerPlugin'
+        }
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}

@@ -27,6 +27,14 @@ setup(
         "click>=8.1.7",
         "python-magic>=0.4.27",
     ],
+    extras_require={
+        # Runtime (dynamic) analysis. Heavy and platform-sensitive, so kept
+        # optional: `pip install android-security-analyzer[dynamic]`.
+        "dynamic": [
+            "frida>=17.0.0",
+            "mitmproxy>=11.0.0",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "android-security-analyzer=analyzer.cli:main",

@@ -1,0 +1,12 @@
+# Optional dependencies for dynamic (runtime) analysis.
+# Install with: pip install -r requirements-dynamic.txt
+# These are heavy and platform-sensitive, so they are kept separate from the
+# core static-analysis requirements.
+
+# Frida 17+ no longer bundles the Java bridge; the analyzer compiles the
+# observer agent with frida-java-bridge resolved via npm or Frida's package
+# manager at first use (or `android-security-analyzer build-agent`).
+frida>=17.0.0
+
+# Network traffic capture/interception (mitmdump). Also enables HAR analysis.
+mitmproxy>=11.0.0

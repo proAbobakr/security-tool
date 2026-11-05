@@ -12,9 +12,9 @@ from .reporter import Reporter
 
 
 @click.group()
-@click.version_option(version='1.0.0')
+@click.version_option(version='1.1.0')
 def main():
-    """Android Security Analyzer - OWASP-based static analysis for APK/AAR/JAR files"""
+    """Android Security Analyzer - OWASP-based static & dynamic analysis for Android apps"""
     pass
 
 
@@ -141,19 +141,125 @@ def batch(directory, pattern, output_dir, format):
     click.echo(f"\n✓ Batch analysis complete. Reports saved to: {output_dir}")
 
 
+def _render_and_exit(results, output, fmt, severity):
+    """Filter by severity, render in the requested format, and set exit code."""
+    severity_order = {'INFO': 0, 'LOW': 1, 'MEDIUM': 2, 'HIGH': 3, 'CRITICAL': 4}
+    min_severity = severity_order[severity]
+    results['findings'] = [
+        f for f in results.get('findings', [])
+        if severity_order.get(f.get('severity', 'INFO'), 0) >= min_severity
+    ]
+
+    reporter = Reporter(results)
+    if fmt == 'console':
+        reporter.print_console()
+    else:
+        {'html': reporter.generate_html,
+         'json': reporter.generate_json,
+         'markdown': reporter.generate_markdown}[fmt](output)
+        click.echo(f"\nReport saved to: {output}")
+
+    findings = results.get('findings', [])
+    click.echo(f"\nTotal findings: {len(findings)}")
+    critical = sum(1 for f in findings if f.get('severity') == 'CRITICAL')
+    high = sum(1 for f in findings if f.get('severity') == 'HIGH')
+    if critical:
+        click.echo(f"⚠️  {critical} CRITICAL issues found!")
+        sys.exit(2)
+    if high:
+        click.echo(f"⚠️  {high} HIGH severity issues found!")
+        sys.exit(1)
+
+
+@main.command()
+@click.argument('package')
+@click.option('--serial', help='Target device serial (adb -s); required if multiple devices')
+@click.option('--duration', default=20.0, type=float, help='Instrumentation window in seconds')
+@click.option('--apk', 'apk_path', type=click.Path(exists=True),
+              help='Install this APK on the device before running')
+@click.option('--attach', is_flag=True, help='Attach to a running process instead of spawning')
+@click.option('--no-frida', is_flag=True, help='Disable Frida runtime instrumentation')
+@click.option('--no-logcat', is_flag=True, help='Disable logcat sensitive-data scanning')
+@click.option('--traffic', is_flag=True, help='Capture live network traffic via mitmdump')
+@click.option('--proxy-port', default=8080, type=int, help='mitmdump listen port')
+@click.option('--har', 'har_path', type=click.Path(exists=True),
+              help='Analyze an existing HAR export (no device needed)')
+@click.option('--flows', 'flows_path', type=click.Path(exists=True),
+              help='Analyze an existing flow JSONL capture (no device needed)')
+@click.option('--output', '-o', default='dynamic-report.html', help='Output file path')
+@click.option('--format', '-f', 'fmt',
+              type=click.Choice(['html', 'json', 'markdown', 'console']),
+              default='html', help='Report format')
+@click.option('--severity', '-s',
+              type=click.Choice(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']),
+              default='INFO', help='Minimum severity level to report')
+def dynamic(package, serial, duration, apk_path, attach, no_frida, no_logcat,
+            traffic, proxy_port, har_path, flows_path, output, fmt, severity):
+    """Run dynamic (runtime) analysis against PACKAGE on a connected device.
+
+    Observes insecure runtime behavior (weak crypto, TLS trust handling,
+    insecure storage, WebView config, and sensitive data in logs/traffic)
+    for authorized assessment of apps you own or are permitted to test.
+    Unavailable tools (adb/frida/mitmproxy) are skipped, not fatal.
+    """
+    from .dynamic import DynamicAnalyzer, DynamicConfig
+
+    cfg = DynamicConfig(
+        package=package, serial=serial, duration=duration, spawn=not attach,
+        enable_frida=not no_frida, enable_logcat=not no_logcat,
+        enable_traffic=traffic, proxy_port=proxy_port, apk_path=apk_path,
+        har_path=har_path, flows_path=flows_path,
+    )
+
+    click.echo(f"Starting dynamic analysis of {package}...")
+    results = DynamicAnalyzer(cfg).analyze(
+        on_event=lambda e: None  # live streaming hook reserved for future use
+    )
+
+    errors = results.get('metadata', {}).get('component_errors', {})
+    for component, message in errors.items():
+        click.echo(f"  [skipped] {component}: {message}", err=True)
+    ran = results.get('metadata', {}).get('components_run', [])
+    click.echo(f"  Components run: {', '.join(ran) if ran else 'none'}")
+
+    _render_and_exit(results, output, fmt, severity)
+
+
+@main.command('build-agent')
+@click.option('--rebuild', is_flag=True, help='Recompile even if a bundle exists')
+def build_agent(rebuild):
+    """Compile the Frida observer agent (bundles frida-java-bridge).
+
+    Useful in CI to produce observer.bundle.js ahead of time so runtime
+    analysis needs no network or Node toolchain on the test host.
+    """
+    from .dynamic.instrumentation import ensure_agent_bundle, InstrumentationError
+    try:
+        path = ensure_agent_bundle(rebuild=rebuild)
+        click.echo(f"Agent bundle ready: {path}")
+    except InstrumentationError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+
 @main.command()
 def info():
     """Display information about the analyzer"""
 
     click.echo("""
-Android Security Analyzer v1.0.0
+Android Security Analyzer v1.1.0
 
-Based on OWASP Mobile Top 10 and MASVS (Mobile Application Security Verification Standard)
+Based on OWASP Mobile Top 10, MASVS, and the Mobile Application Security
+Testing Guide (MASTG).
 
-Supported file types:
-  - APK (Android Application Package)
-  - AAR (Android Archive)
-  - JAR (Java Archive)
+Static analysis (analyze/batch) - APK, AAR, JAR:
+  Manifest, permissions, components, crypto strings, secrets, obfuscation.
+
+Dynamic analysis (dynamic) - live app on a device/emulator:
+  Runtime crypto & TLS trust handling, insecure storage, WebView config,
+  and sensitive data in logs/network traffic. Requires adb + frida-server;
+  optional mitmproxy for traffic. Offline HAR/JSONL traffic analysis needs
+  no device. For authorized testing of apps you own or may assess.
 
 Security checks performed:
   - M1: Improper Platform Usage

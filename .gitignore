@@ -50,6 +50,13 @@ build/
 gradle-app.setting
 !gradle-wrapper.jar
 
+# Dynamic analysis build artifacts
+analyzer/dynamic/agents/node_modules/
+analyzer/dynamic/agents/observer.bundle.js
+analyzer/dynamic/agents/package.json
+analyzer/dynamic/agents/package-lock.json
+flows.jsonl
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,13 +1,16 @@
 # Android Security Analyzer
 
-A comprehensive OWASP-based static analysis tool for Android applications. Analyzes APK, AAR, and JAR files for security vulnerabilities following OWASP Mobile Top 10 and MASVS (Mobile Application Security Verification Standard) guidelines.
+A comprehensive OWASP-based security analysis tool for Android applications. Performs **static analysis** of APK, AAR, and JAR files and **dynamic (runtime) analysis** of a live app on a device/emulator, following the OWASP Mobile Top 10, MASVS, and the Mobile Application Security Testing Guide (MASTG).
+
+> Intended for authorized assessment of applications you own or are explicitly permitted to test.
 
 ## Features
 
 ### 🔍 Comprehensive Security Analysis
 - **OWASP Mobile Top 10** coverage
 - **MASVS** compliance checking
-- Support for **APK**, **AAR**, and **JAR** files
+- **Static** analysis of **APK**, **AAR**, and **JAR** files
+- **Dynamic** (runtime) analysis of a live app: crypto & TLS trust handling, insecure storage, WebView config, and sensitive data in logs/network traffic
 - Detailed security findings with remediation recommendations
 
 ### 📊 Multiple Report Formats
@@ -97,6 +100,29 @@ python -m analyzer.cli batch /path/to/libraries --pattern "*.aar" --format json
 # Display analyzer capabilities
 python -m analyzer.cli info
 ```
+
+### Dynamic Analysis (runtime)
+
+Observes how the app actually behaves at runtime and reports insecure patterns. See [docs/DYNAMIC_ANALYSIS.md](docs/DYNAMIC_ANALYSIS.md) for the full setup.
+
+```bash
+# Install optional runtime dependencies (Frida + mitmproxy)
+pip install -r requirements-dynamic.txt      # or: pip install .[dynamic]
+
+# Pre-compile the Frida observer agent (bundles frida-java-bridge; optional)
+python -m analyzer.cli build-agent
+
+# Analyze a running package on the connected device/emulator
+python -m analyzer.cli dynamic com.example.app --duration 30 -f html -o dyn.html
+
+# Install an APK, instrument it, and also capture live traffic via mitmdump
+python -m analyzer.cli dynamic com.example.app --apk app.apk --traffic --proxy-port 8080
+
+# No device? Analyze an existing HAR or flow capture offline
+python -m analyzer.cli dynamic com.example.app --no-frida --no-logcat --har session.har -f console
+```
+
+**Requirements:** `adb` (Android platform-tools) and a `frida-server` on the device matching your Frida version; `mitmproxy` only for `--traffic`. Any unavailable component is skipped with a clear message rather than failing the run — so a partial setup (e.g. offline HAR analysis) still produces a report.
 
 ### Gradle Integration
 
@@ -245,19 +271,29 @@ security_analysis:
 ### Project Structure
 ```
 security-tool/
-├── analyzer/              # Core analyzer package
+├── analyzer/                 # Core analyzer package
 │   ├── __init__.py
-│   ├── core.py           # Main analyzer logic
-│   ├── owasp_checks.py   # OWASP security checks
-│   ├── reporter.py       # Report generation
-│   └── cli.py            # Command-line interface
-├── gradle-plugin/        # Gradle plugin
-│   ├── build.gradle
-│   └── src/main/groovy/
-├── examples/             # Usage examples
-├── config.yaml           # Configuration file
-├── requirements.txt      # Python dependencies
-├── setup.py             # Package setup
+│   ├── core.py               # Static analyzer logic
+│   ├── owasp_checks.py       # Static OWASP security checks
+│   ├── reporter.py           # Report generation (HTML/JSON/MD/console)
+│   ├── cli.py                # Command-line interface
+│   └── dynamic/              # Dynamic (runtime) analysis
+│       ├── runner.py         # Orchestrator -> unified findings
+│       ├── device.py         # adb wrapper
+│       ├── instrumentation.py# Frida session + agent bundling
+│       ├── traffic.py        # mitmproxy capture + flow/HAR analysis
+│       ├── logcat.py         # logcat sensitive-data scanner
+│       ├── patterns.py       # shared sensitive-data patterns
+│       ├── agents/observer.js# Frida observer agent (source)
+│       └── addons/flow_logger.py  # mitmdump addon
+├── gradle-plugin/            # Gradle plugin
+├── examples/                 # Usage examples
+├── tests/                    # Unit tests
+├── docs/                     # Documentation
+├── config.yaml               # Configuration file
+├── requirements.txt          # Core dependencies
+├── requirements-dynamic.txt  # Optional runtime-analysis dependencies
+├── setup.py                  # Package setup
 └── README.md
 ```
 
@@ -315,7 +351,15 @@ This tool provides automated security analysis based on OWASP guidelines. It sho
 
 ## Changelog
 
-### Version 1.0.0 (2025-01-15)
+### Version 1.1.0
+- Dynamic (runtime) analysis: `dynamic` and `build-agent` commands
+- Frida observer agent for crypto, TLS trust, storage, and WebView observation
+- Network traffic analysis via mitmproxy, plus offline HAR/JSONL analysis
+- logcat sensitive-data scanning
+- Graceful degradation when adb/frida/mitmproxy are unavailable
+- Unit test suite for the dynamic pipeline
+
+### Version 1.0.0
 - Initial release
 - OWASP Mobile Top 10 coverage
 - Support for APK, AAR, and JAR files
